@@ -45,7 +45,7 @@ body:
     attributes:
       label: Environment
       description: Please provide information about your environment (OS, Python version, dependencies, etc.).
-      placeholder: OS: ..., Python: ..., Dependencies: ...
+      placeholder: [OS: ..., Python: ..., Dependencies: ...]
     validations:
       required: false
   - type: textarea
