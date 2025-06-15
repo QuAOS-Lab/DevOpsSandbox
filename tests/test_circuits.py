@@ -1,5 +1,4 @@
 import sys
-sys.path.append("./")
 from quaos.paulis import random_pauli_string
 from quaos.circuits.known_circuits import to_x, to_ix
 # TODO: Make these proper tests

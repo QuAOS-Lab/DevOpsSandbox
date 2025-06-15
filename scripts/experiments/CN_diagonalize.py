@@ -1,13 +1,7 @@
-
-
-import sys
-
-sys.path.append("./")
-
 import numpy as np
-from quaos.prime_Functions_Andrew import *
-from quaos.prime_Functions_quditV2 import *
-from quaos.pauli import *
+from quaos.core.prime_Functions_Andrew import *
+from quaos.core.prime_Functions_quditV2 import *
+from quaos.core.pauli import *
 
 
 def main():
