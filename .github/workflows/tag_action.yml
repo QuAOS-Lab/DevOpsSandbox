@@ -44,22 +44,85 @@ jobs:
           echo "Latest main tag: $tag"
           echo "main_tag=$tag" >> $GITHUB_OUTPUT
 
-      - name: Determine bump and tag (scripted)
-        id: semver_tag
-        run: scripts/tools/shell/semver_tag.sh
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          DEV_TAG: ${{ steps.get_dev_tag.outputs.dev_tag }}
-          SOURCE_BRANCH: ${{ steps.detect.outputs.source_branch }}
-          TARGET_BRANCH: ${{ steps.detect.outputs.target_branch }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
+      - name: Determine bump from PR body or commits
+        id: pr_bump
+        run: |
+          body="${{ github.event.pull_request.body }}"
+          bump=""
+          if echo "$body" | grep -iq '\[x\] *Major'; then
+            bump="major"
+          elif echo "$body" | grep -iq '\[x\] *Minor'; then
+            bump="minor"
+          elif echo "$body" | grep -iq '\[x\] *Patch'; then
+            bump="patch"
+          fi
+          if [ -z "$bump" ]; then
+            # Fallback to commit message analysis
+            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
+            if [ "$tag" = "v0.0.0" ]; then
+              range="origin/dev"
+            else
+              range="$tag..origin/dev"
+            fi
+            commits=$(git log $range --pretty=format:%s)
+            bump="patch"
+            for msg in $commits; do
+              if [[ "$msg" == *"BREAKING CHANGE"* ]]; then
+                bump="major"
+                break
+              elif [[ "$msg" == feat:* && "$bump" != "major" ]]; then
+                bump="minor"
+              elif [[ "$msg" == fix:* && "$bump" == "patch" ]]; then
+                bump="patch"
+              fi
+            done
+          fi
+          echo "bump=$bump" >> $GITHUB_OUTPUT
+
+      - name: Handle tagging logic
+        id: tag_logic
+        run: |
+          source="${{ steps.detect.outputs.source_branch }}"
+          target="${{ steps.detect.outputs.target_branch }}"
+          if [ "$source" = "dev" ] && [ "$target" = "main" ]; then
+            # Copy dev tag to main
+            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
+            echo "Copying dev tag $tag to main"
+            echo "final_tag=$tag" >> $GITHUB_OUTPUT
+            echo "copy_tag=true" >> $GITHUB_OUTPUT
+          else
+            # Semver bump for PRs into dev, based on PR body or commits
+            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
+            version=${tag#v}
+            IFS='.' read -r major minor patch <<< "$version"
+            bump="${{ steps.pr_bump.outputs.bump }}"
+            if [ "$bump" = "major" ]; then
+              major=$((major + 1))
+              minor=0
+              patch=0
+            elif [ "$bump" = "minor" ]; then
+              minor=$((minor + 1))
+              patch=0
+            else
+              patch=$((patch + 1))
+            fi
+            next_version="v$major.$minor.$patch"
+            # Count only commits on dev since last tag
+            if [ "$tag" = "v0.0.0" ]; then
+              commit_count=$(git rev-list --count origin/dev)
+            else
+              commit_count=$(git rev-list --count $tag..origin/dev)
+            fi
+            full_tag="$next_version.$commit_count"
+            echo "final_tag=$full_tag" >> $GITHUB_OUTPUT
+            echo "copy_tag=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create and push tag
-        if: steps.semver_tag.outputs.copy_tag == 'true' || steps.semver_tag.outputs.copy_tag == 'false'
+        if: steps.tag_logic.outputs.copy_tag == 'true' || steps.tag_logic.outputs.copy_tag == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git tag ${{ steps.semver_tag.outputs.final_tag }}
-          git push origin ${{ steps.semver_tag.outputs.final_tag }}
+          git tag ${{ steps.tag_logic.outputs.final_tag }}
+          git push origin ${{ steps.tag_logic.outputs.final_tag }}
