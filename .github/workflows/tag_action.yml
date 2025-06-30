@@ -44,7 +44,7 @@ jobs:
           echo "Latest main tag: $tag"
           echo "main_tag=$tag" >> $GITHUB_OUTPUT
 
-      - name: Determine bump from PR body or commits
+      - name: Determine bump from PR body or default to patch
         id: pr_bump
         run: |
           body="${{ github.event.pull_request.body }}"
@@ -57,25 +57,7 @@ jobs:
             bump="patch"
           fi
           if [ -z "$bump" ]; then
-            # Fallback to commit message analysis
-            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
-            if [ "$tag" = "v0.0.0" ]; then
-              range="origin/dev"
-            else
-              range="$tag..origin/dev"
-            fi
-            commits=$(git log $range --pretty=format:%s)
-            bump="patch"
-            for msg in $commits; do
-              if [[ "$msg" == *"BREAKING CHANGE"* ]]; then
-                bump="major"
-                break
-              elif [[ "$msg" == feat:* && "$bump" != "major" ]]; then
-                bump="minor"
-              elif [[ "$msg" == fix:* && "$bump" == "patch" ]]; then
-                bump="patch"
-              fi
-            done
+            bump="commits"
           fi
           echo "bump=$bump" >> $GITHUB_OUTPUT
 
@@ -94,8 +76,9 @@ jobs:
             # Semver bump for PRs into dev, based on PR body or commits
             tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
             version=${tag#v}
-            IFS='.' read -r major minor patch <<< "$version"
+            IFS='.' read -r major minor patch extra <<< "$version"
             bump="${{ steps.pr_bump.outputs.bump }}"
+
             if [ "$bump" = "major" ]; then
               major=$((major + 1))
               minor=0
@@ -107,12 +90,19 @@ jobs:
               patch=$((patch + 1))
             fi
             next_version="v$major.$minor.$patch"
+
             # Count only commits on dev since last tag
-            if [ "$tag" = "v0.0.0" ]; then
+            if [ "$bump" = "commits" ]; then
+              if [ "$tag" = "v0.0.0" ]; then
               commit_count=$(git rev-list --count origin/dev)
-            else
+              else
               commit_count=$(git rev-list --count $tag..origin/dev)
+              fi
             fi
+            else
+              commit_count=0
+            fi
+
             full_tag="$next_version.$commit_count"
             echo "final_tag=$full_tag" >> $GITHUB_OUTPUT
             echo "copy_tag=false" >> $GITHUB_OUTPUT
