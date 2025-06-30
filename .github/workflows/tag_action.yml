@@ -31,7 +31,7 @@ jobs:
       - name: Get latest SemVer tag on dev
         id: get_dev_tag
         run: |
-          git fetch origin dev:dev
+          git fetch --all --tags
           tag=$(git describe --tags $(git rev-list --tags --remotes=origin/dev --max-count=1) 2>/dev/null || echo "v0.0.0")
           echo "Latest dev tag: $tag"
           echo "dev_tag=$tag" >> $GITHUB_OUTPUT
@@ -39,7 +39,7 @@ jobs:
       - name: Get latest SemVer tag on main
         id: get_main_tag
         run: |
-          git fetch origin main:main
+          git fetch --all --tags
           tag=$(git describe --tags $(git rev-list --tags --remotes=origin/main --max-count=1) 2>/dev/null || echo "v0.0.0")
           echo "Latest main tag: $tag"
           echo "main_tag=$tag" >> $GITHUB_OUTPUT
