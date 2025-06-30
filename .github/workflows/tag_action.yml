@@ -59,6 +59,7 @@ jobs:
           if [ -z "$bump" ]; then
             bump="commits"
           fi
+          echo "Bump determined: $bump"
           echo "bump=$bump" >> $GITHUB_OUTPUT
 
       - name: Handle tagging logic
