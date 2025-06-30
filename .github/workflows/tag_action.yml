@@ -98,7 +98,6 @@ jobs:
               else
               commit_count=$(git rev-list --count $tag..origin/dev)
               fi
-            fi
             else
               commit_count=0
             fi
