@@ -1,11 +1,11 @@
 
+from typing import Any
 import numpy as np
 import re
 from .pauli import Pauli
 from .pauli_string import PauliString
 from .pauli_sum import PauliSum
 import networkx as nx
-import matplotlib.pyplot as plt
 
 
 def to_pauli_sum(P: Pauli | PauliString) -> PauliSum:
@@ -53,7 +53,7 @@ def string_to_symplectic(string: str) -> tuple[np.ndarray, int]:
             p = int(match.group(3)) if match.group(3) is not None else 0
             local_symplectics.append((x, z))
             phases.append(p)
-    
+
     symplectic = np.array(local_symplectics).T
     return symplectic.flatten(), sum(phases)
 
@@ -91,29 +91,31 @@ def check_mappable_via_clifford(pauli_sum: PauliSum, target_pauli_sum: PauliSum)
     return bool(np.all(pauli_sum.symplectic_product_matrix() == target_pauli_sum.symplectic_product_matrix()))
 
 
+# TODO: correct type hint error
 def concatenate_pauli_sums(pauli_sums: list[PauliSum]) -> PauliSum:
     """
     Concatenate a list of Pauli sums into a single Pauli sum.
     """
-    if len(pauli_sums) == 0:
-        raise ValueError("List of Pauli sums is empty")
-    if not all(isinstance(p, PauliSum) for p in pauli_sums):
-        raise ValueError("All elements of the list must be Pauli sums")
-    
-    new_pauli_strings = pauli_sums[0].pauli_strings.copy()
-    new_dimensions = pauli_sums[0].dimensions.copy()
-    new_weights = pauli_sums[0].weights.copy()
-    new_phases = pauli_sums[0].phases.copy()
-    for p in pauli_sums[1:]:
-        new_dimensions = np.concatenate((new_dimensions, p.dimensions))
-        new_weights *= p.weights
-        new_phases += p.phases
-        for i in range(len(new_pauli_strings)):
-            new_pauli_strings[i] = new_pauli_strings[i] @ p.pauli_strings[i]
+    # if len(pauli_sums) == 0:
+    #     raise ValueError("List of Pauli sums is empty")
+    # if not all(isinstance(p, PauliSum) for p in pauli_sums):
+    #     raise ValueError("All elements of the list must be Pauli sums")
 
-    concatenated = PauliSum(new_pauli_strings, weights=new_weights, phases=new_phases, dimensions=new_dimensions,
-                            standardise=False)
-    return concatenated
+    # new_pauli_strings = pauli_sums[0].pauli_strings.copy()
+    # new_dimensions = pauli_sums[0].dimensions.copy()
+    # new_weights = pauli_sums[0].weights.copy()
+    # new_phases = pauli_sums[0].phases.copy()
+    # for p in pauli_sums[1:]:
+    #     new_dimensions = np.concatenate((new_dimensions, p.dimensions))
+    #     new_weights *= p.weights
+    #     new_phases += p.phases
+    #     for i in range(len(new_pauli_strings)):
+    #         new_pauli_strings[i] = new_pauli_strings[i] @ p.pauli_strings[i]
+
+    # concatenated = PauliSum(new_pauli_strings, weights=new_weights, phases=new_phases, dimensions=new_dimensions,
+    #                         standardise=False)
+    # return concatenated
+    raise NotImplementedError()
 
 
 def are_subsets_equal(pauli_sum_1: PauliSum, pauli_sum_2: PauliSum,
@@ -130,14 +132,14 @@ def are_subsets_equal(pauli_sum_1: PauliSum, pauli_sum_2: PauliSum,
             raise ValueError("Subsets must be lists of tuples of length 2")
         if not all(isinstance(i, tuple) and len(i) == 2 for i in subset_2):
             raise ValueError("Subsets must be lists of tuples of length 2")
-        
+
     for i in range(len(subset_1)):
         if pauli_sum_1[subset_1[i]] != pauli_sum_2[subset_2[i]]:
             return False
     return True
 
 
-def commutation_graph(pauli_sum: PauliSum, labels: list[str] | None = None, axis: plt.Axes | None = None):
+def commutation_graph(pauli_sum: PauliSum, labels: list[str] | None = None, axis: Any | None = None):
     """
     Plots graph where adjacency matrix is the symplectic product matrix
     """
@@ -153,3 +155,118 @@ def commutation_graph(pauli_sum: PauliSum, labels: list[str] | None = None, axis
 
     nx.draw(gr, pos1, node_size=900, labels=labels, with_labels=True, ax=axis)
     return gr
+
+
+def modinv(a, d):
+    for i in range(1, d):
+        if (a * i) % d == 1:
+            return i
+    raise ValueError(f"No inverse for {a} mod {d}")
+
+
+def row_reduce_mod_d(A, d):
+    A = A.copy() % d
+    m, n = A.shape
+    rank = 0
+    pivots = []
+    for col in range(n):
+        for row in range(rank, m):
+            if A[row, col] != 0:
+                break
+        else:
+            continue
+        if row != rank:
+            A[[row, rank]] = A[[rank, row]]
+        inv = modinv(A[rank, col], d)
+        A[rank] = (A[rank] * inv) % d
+        for r in range(m):
+            if r != rank and A[r, col] != 0:
+                A[r] = (A[r] - A[r, col] * A[rank]) % d
+        pivots.append(col)
+        rank += 1
+    return A, pivots, rank
+
+
+def solve_mod_d(A, b, d, max_solutions=1000):
+    from itertools import product
+    import sympy as sp
+
+    A = sp.Matrix(A.tolist())
+    b = sp.Matrix(b.tolist())
+    A_aug = A.row_join(b)
+    A_mod = A_aug.applyfunc(lambda x: x % d)
+
+    Ab_rref, pivot_cols = A_mod.rref(iszerofunc=lambda x: x % d == 0, simplify=True)
+    n_vars = A.shape[1]
+
+    pivot_cols = [p for p in pivot_cols if p < n_vars]
+    free_vars = [i for i in range(n_vars) if i not in pivot_cols]
+
+    solutions = []
+    for free_vals in product(range(d), repeat=len(free_vars)):
+        sol = [0] * n_vars
+        for i, val in zip(free_vars, free_vals):
+            sol[i] = val
+
+        for i, pivot in enumerate(pivot_cols):
+            rhs = Ab_rref[i, -1]
+            lhs = sum(Ab_rref[i, j] * sol[j] for j in range(n_vars)) % d
+            sol[pivot] = int((rhs - lhs) % d)
+
+        solutions.append(np.array(sol, dtype=int))
+        if len(solutions) >= max_solutions:
+            break
+
+    return solutions
+
+
+def is_symplectic(M, d):
+    n = M.shape[0] // 2
+    if M.shape[0] != M.shape[1] or M.shape[0] % 2 != 0:
+        return False
+    J = np.block([[np.zeros((n, n), dtype=int), np.eye(n, dtype=int)],
+                  [-np.eye(n, dtype=int), np.zeros((n, n), dtype=int)]]) % d
+    return np.array_equal((M.T @ J @ M) % d, J % d)
+
+
+def find_symplectic_maps(H, H_prime, d, max_solutions=1000):
+    """
+    Find symplectic matrices M such that H M^T = H' mod d.
+
+    This function attempts to find matrices M that satisfy the equation
+    H M^T = H' (mod d), where H and H' are given matrices, M^T is the transpose
+    of M, and d is the modulus. Only symplectic matrices M are returned.
+
+    Parameters:
+    H : np.ndarray
+        The left-hand side matrix in the equation, with shape (n, k).
+    H_prime : np.ndarray
+        The right-hand side matrix in the equation, with the same shape as H.
+    d : int
+        The modulus for the equation.
+    max_solutions : int, optional
+        The maximum number of solutions to return. Default is 1000.
+
+    Returns:
+    List[np.ndarray]
+        A list of symplectic matrices M that satisfy the equation.
+    """
+
+    n, k = H.shape
+    assert H_prime.shape == (n, k)
+    num_vars = k * k  # because M is k x k, and we are solving for M^T
+
+    A = np.zeros((n * k, num_vars), dtype=int)
+    b = H_prime.flatten()
+
+    for i in range(n):       # row index of H, H'
+        for j in range(k):   # column index of H'
+            row_idx = i * k + j
+            for l in range(k):  # column index of H, row index of M^T
+                col_idx = j * k + l  # since M^T[j, l] = M[l, j]
+                A[row_idx, col_idx] = H[i, l]
+
+    raw_solutions = solve_mod_d(A, b, d, max_solutions)
+    Ms = [sol.reshape((k, k)).T for sol in raw_solutions]  # Transpose back to M
+    Ms_symp = [M for M in Ms if is_symplectic(M, d)]
+    return Ms_symp

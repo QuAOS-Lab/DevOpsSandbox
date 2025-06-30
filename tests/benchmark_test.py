@@ -1,15 +1,18 @@
 import pytest
-from pathlib import Path
 import numpy as np
+
+import sys
+from pathlib import Path
+root = Path(__file__).parent.parent
+sys.path.append(str(root))
+
 from quaos.core.prime_Functions_Andrew import ground_state
 from quaos.core.prime_Functions_quditV2 import (
     random_pauli_hamiltonian, sort_hamiltonian,  
     bucket_filling_qudit, weighted_vertex_covering_maximal_cliques
 )
 
-root = Path(__file__).parent.parent
 
-@pytest.mark.skip(reason="Temporarily disabled for debugging")
 @pytest.mark.benchmark
 def test_main_function(benchmark):
     P, cc = random_pauli_hamiltonian(20, [3, 3, 3])

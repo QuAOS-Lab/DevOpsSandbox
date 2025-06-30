@@ -2,13 +2,14 @@ import pytest
 import sys
 import os
 import numpy as np
-from quaos.paulis import PauliSum, PauliString, Pauli
-from quaos.paulis.pauli import Xnd, Ynd, Znd
 
 test_dir = os.path.dirname(os.path.abspath(__file__))
 module_dir = os.path.join(test_dir, "..")
+sys.path.append(module_dir)
+sys.path.append(test_dir)
+from quaos.symplectic import PauliSum, PauliString, Pauli, Xnd, Ynd, Znd
 
-@pytest.mark.skip(reason="Temporarily disabled for debugging")
+
 class TestSymplectic:
 
     def test_symplectic_matrix_single_pauli(self):

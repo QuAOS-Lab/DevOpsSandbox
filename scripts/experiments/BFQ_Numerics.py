@@ -1,13 +1,3 @@
-from quaos.core.prime_Functions_quditV2 import (
-    random_pauli_hamiltonian, sort_hamiltonian, bucket_filling_qudit,
-    bayes_covariance_graph, error_correction_estimation
-)
-from quaos.core.prime_Functions_Andrew import (
-    ground_state, weighted_vertex_covering_maximal_cliques, scale_variances,
-    Hamiltonian_Mean, bucket_filling_mod, bayes_variance_graph, graph
-)
-from quaos.core.prime_Functions_quditV2 import *
-from quaos.core.prime_Functions_Andrew import *
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -20,7 +10,17 @@ sys.path.append(str(root_path))
 
 # TODO: duplicate variance_graph definition in the two modules. A rename is required.
 # currently using the one from prime_Functions_quditV2
+from quaos.core.prime_Functions_Andrew import *
+from quaos.core.prime_Functions_quditV2 import *
 
+from quaos.core.prime_Functions_Andrew import (
+    ground_state, weighted_vertex_covering_maximal_cliques, scale_variances,
+    Hamiltonian_Mean, bucket_filling_mod, bayes_variance_graph, graph
+)
+from quaos.core.prime_Functions_quditV2 import (
+    random_pauli_hamiltonian, sort_hamiltonian, bucket_filling_qudit, 
+    bayes_covariance_graph, error_correction_estimation
+)
 
 np.set_printoptions(linewidth=200)
 
@@ -48,8 +48,7 @@ def main():
     # Numerical Setups - variable parameters
     general_commutation_options = [True, False]
     adaptive_options = [
-        np.array([6, 12, 25, 50, 100, 200, 400, 800, 1600,
-                 3200, 6400, 12800, 25600, 51200, 102400]),
+        np.array([6, 12, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400]), 
         np.array([0])
     ]
 
@@ -65,8 +64,7 @@ def main():
 
     # Simulation
     results = np.zeros((repeats, len(intermediate_results_list), 6, 4))
-    settings = ['GC + adaptive', 'GC + non-adaptive', 'BC + adaptive',
-                'BC + non-adaptive', 'Andrew', 'True Covariance']
+    settings = ['GC + adaptive', 'GC + non-adaptive', 'BC + adaptive', 'BC + non-adaptive', 'Andrew', 'True Covariance']
 
     for i_r in range(repeats):
         print('repeat:', i_r)
@@ -80,14 +78,14 @@ def main():
                 print('Setting: ', settings[i_setting])
                 S, X, xxx, CG, X_list, S_list, D = bucket_filling_qudit(
                     P, cc, psi, shots, part_func, pauli_block_sizes,
-                    full_simulation=full_simulation,
+                    full_simulation=full_simulation, 
                     update_steps=update_steps,
                     general_commutation=general_commutation,
                     D=D,
                     M_list=intermediate_results_list,
                     allocation_mode=allocation_mode,
                     mcmc_shot_scale=mcmc_shot_scale,
-                    N_mcmc=N,
+                    N_mcmc=N, 
                     N_mcmc_max=N_max,
                     p_noise=p_noise,
                     Q_progress_bar=False
@@ -99,12 +97,9 @@ def main():
                     results[i_r, k, i_setting, 0] = sum(
                         cc[i0] * sum(X[i0, i0, i1] * math.e**(2 * 1j * math.pi * i1 / P.lcm) for i1 in range(P.lcm)) / sum(X[i0, i0, i1] for i1 in range(P.lcm)) if sum(X[i0, i0, i1] for i1 in range(P.lcm)) > 0 else 0 for i0 in range(p)
                     ).real
-                    results[i_r, k, i_setting, 1] = np.sqrt(np.sum(scale_variances(graph(bayes_covariance_graph(
-                        X, np.array(cc), CG.adj, p, pauli_block_sizes, int(P.lcm), N=N, N_max=N_max)), S).adj)).real
-                    results[i_r, k, i_setting, 2] = np.sqrt(
-                        np.sum(scale_variances(vg, S).adj)).real
-                    results[i_r, k, i_setting, 3] = error_correction_estimation(
-                        P, cc, X, xxx[0:intermediate_results_list[k]], p_noise)
+                    results[i_r, k, i_setting, 1] = np.sqrt(np.sum(scale_variances(graph(bayes_covariance_graph(X, np.array(cc), CG.adj, p, pauli_block_sizes, int(P.lcm), N=N, N_max=N_max)), S).adj)).real
+                    results[i_r, k, i_setting, 2] = np.sqrt(np.sum(scale_variances(vg, S).adj)).real
+                    results[i_r, k, i_setting, 3] = error_correction_estimation(P, cc, X, xxx[0:intermediate_results_list[k]], p_noise)
 
                 i_setting += 1
                 print()
@@ -112,24 +107,20 @@ def main():
 
         # AEQuO by Andrew
         print('Setting: ', settings[i_setting])
-        update_steps = np.array(
-            [6, 12, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400])
+        update_steps = np.array([6, 12, 25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 102400])
         for k, M in enumerate(intermediate_results_list):
             print('k', k)
             S, X, xxx = bucket_filling_mod(
-                P, cc, psi, M, part_func,
+                P, cc, psi, M, part_func, 
                 update_steps=update_steps,
                 repeats=(0, 1),
                 full_simulation=True,
                 general_commutation=True,
                 best_possible=False
             )
-            results[i_r, k, i_setting, 0] = sum(cc[i0]*sum(X[i0, i0][i1, i1] * math.e**(2 * 1j * math.pi * i1 / P.lcm) for i1 in range(P.lcm)) / sum(
-                X[i0, i0][i1, i1] for i1 in range(P.lcm)) if sum(X[i0, i0][i1, i1] for i1 in range(P.lcm)) > 0 else 0 for i0 in range(p)).real
-            results[i_r, k, i_setting, 1] = np.sqrt(
-                np.sum(scale_variances(bayes_variance_graph(X, cc), S).adj)).real
-            results[i_r, k, i_setting, 2] = np.sqrt(
-                np.sum(scale_variances(vg, S).adj)).real
+            results[i_r, k, i_setting, 0] = sum(cc[i0]*sum(X[i0, i0][i1, i1] * math.e**(2 * 1j * math.pi * i1 / P.lcm) for i1 in range(P.lcm)) / sum(X[i0, i0][i1, i1] for i1 in range(P.lcm)) if sum(X[i0, i0][i1, i1] for i1 in range(P.lcm)) > 0 else 0 for i0 in range(p)).real
+            results[i_r, k, i_setting, 1] = np.sqrt(np.sum(scale_variances(bayes_variance_graph(X, cc), S).adj)).real
+            results[i_r, k, i_setting, 2] = np.sqrt(np.sum(scale_variances(vg, S).adj)).real
         i_setting += 1
         print()
         print()
@@ -154,14 +145,10 @@ def main():
         for k, X in enumerate(X_list):
             print('k', k)
             S = S_list[k]
-            results[i_r, k, i_setting, 0] = sum(cc[i0] * sum(X[i0, i0, i1] * math.e**(2 * 1j * math.pi * i1 / P.lcm) for i1 in range(P.lcm)) / sum(
-                X[i0, i0, i1] for i1 in range(P.lcm)) if sum(X[i0, i0, i1] for i1 in range(P.lcm)) > 0 else 0 for i0 in range(p)).real
-            results[i_r, k, i_setting, 1] = np.sqrt(np.sum(scale_variances(graph(bayes_covariance_graph(
-                X, np.array(cc), CG.adj, p, pauli_block_sizes, int(P.lcm), N=N, N_max=N_max)), S).adj)).real
-            results[i_r, k, i_setting, 2] = np.sqrt(
-                np.sum(scale_variances(vg, S).adj)).real
-            results[i_r, k, i_setting, 3] = error_correction_estimation(
-                P, cc, X, xxx, p_noise)
+            results[i_r, k, i_setting, 0] = sum(cc[i0] * sum(X[i0, i0, i1] * math.e**(2 * 1j * math.pi * i1 / P.lcm) for i1 in range(P.lcm)) / sum(X[i0, i0, i1] for i1 in range(P.lcm)) if sum(X[i0, i0, i1] for i1 in range(P.lcm)) > 0 else 0 for i0 in range(p)).real
+            results[i_r, k, i_setting, 1] = np.sqrt(np.sum(scale_variances(graph(bayes_covariance_graph(X, np.array(cc), CG.adj, p, pauli_block_sizes, int(P.lcm), N=N, N_max=N_max)), S).adj)).real
+            results[i_r, k, i_setting, 2] = np.sqrt(np.sum(scale_variances(vg, S).adj)).real
+            results[i_r, k, i_setting, 3] = error_correction_estimation(P, cc, X, xxx, p_noise)
 
         stop1 = timeit.default_timer()
         print()
@@ -184,22 +171,21 @@ def main():
 
     fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(9, 9))
 
-    for i in n_plot:
-        for j in range(len(intermediate_results_list)):
+    for i in n_plot: 
+        for j in range(len(intermediate_results_list)): 
             y_dat[i, j] = np.mean(np.abs(results[:, j, i, 0] - H_mean))
-            y_err_dat[i, j] = np.sqrt(
-                np.mean(results[:, j, i, 1]**2 + results[:, j, i, 3]))
+            y_err_dat[i, j] = np.sqrt(np.mean(results[:, j, i, 1]**2 + results[:, j, i, 3]))
 
     for i in n_plot:
         ax[i // 2, i % 2].errorbar(
-            x_dat[0:], y_dat[i, 0:],
-            yerr=y_err_dat[i, 0:],
-            fmt='o',
+            x_dat[0:], y_dat[i, 0:], 
+            yerr=y_err_dat[i, 0:], 
+            fmt='o', 
             ecolor='k',
-            capsize=1,
-            capthick=0.75,
-            markersize=5,
-            elinewidth=0.75,
+            capsize=1, 
+            capthick=0.75, 
+            markersize=5, 
+            elinewidth=0.75, 
             label=settings[i]
         )
 
@@ -222,38 +208,33 @@ def main():
 
     fig, ax = plt.subplots(ncols=2, nrows=3, figsize=(9, 9))
 
-    for i in n_plot:
-        for j in range(len(intermediate_results_list)):
-            y_dat[i, j] = np.mean((results[:, j, i, 1]**2 + results[:, j, i, 3])
-                                  * intermediate_results_list[j] / (H_mean)**2)
-            y_err_dat[i, j] = np.std(
-                (results[:, j, i, 1]**2 + results[:, j, i, 3]) * intermediate_results_list[j] / (H_mean)**2)
+    for i in n_plot: 
+        for j in range(len(intermediate_results_list)): 
+            y_dat[i, j] = np.mean((results[:, j, i, 1]**2 + results[:, j, i, 3]) * intermediate_results_list[j] / (H_mean)**2)  
+            y_err_dat[i, j] = np.std((results[:, j, i, 1]**2 + results[:, j, i, 3]) * intermediate_results_list[j] / (H_mean)**2) 
 
     y_true_dat = np.zeros((6, len(intermediate_results_list)))
     y_true_err_dat = np.zeros((6, len(intermediate_results_list)))
-    for i in n_plot:
-        for j in range(len(intermediate_results_list)):
-            y_true_dat[i, j] = np.mean(
-                results[:, j, i, 2]**2 * intermediate_results_list[j] / (H_mean)**2)
-            y_true_err_dat[i, j] = np.std(
-                results[:, j, i, 2]**2 * intermediate_results_list[j] / (H_mean)**2)
+    for i in n_plot: 
+        for j in range(len(intermediate_results_list)): 
+            y_true_dat[i, j] = np.mean(results[:, j, i, 2]**2 * intermediate_results_list[j] / (H_mean)**2)  
+            y_true_err_dat[i, j] = np.std(results[:, j, i, 2]**2 * intermediate_results_list[j] / (H_mean)**2)
 
     for i in n_plot:
         ax[i // 2, i % 2].errorbar(
-            x_dat[:], y_true_dat[i, :], yerr=y_true_err_dat[i, :], fmt='s', ecolor='k',
-            capsize=1, capthick=0.75, markersize=5, elinewidth=0.75,
+            x_dat[:], y_true_dat[i, :], yerr=y_true_err_dat[i, :], fmt='s', ecolor='k', 
+            capsize=1, capthick=0.75, markersize=5, elinewidth=0.75, 
             label=settings[i] + ' True Error'
         )
         ax[i // 2, i % 2].set_xscale('log')
-        ax[i // 2, i %
-            2].set_ylabel(r'$M \,  \frac{(\Delta \tilde{O})^2}{\tilde{O}^2}$')
+        ax[i // 2, i % 2].set_ylabel(r'$M \,  \frac{(\Delta \tilde{O})^2}{\tilde{O}^2}$')
         ax[i // 2, i % 2].set_xlabel(r'shots $M$')
         ax[i // 2, i % 2].set_title(settings[i])
 
     for i in n_plot:
         ax[i // 2, i % 2].errorbar(
-            x_dat[:], y_dat[i, :], yerr=y_err_dat[i, :], fmt='o', ecolor='k',
-            capsize=1, capthick=0.75, markersize=5, elinewidth=0.75,
+            x_dat[:], y_dat[i, :], yerr=y_err_dat[i, :], fmt='o', ecolor='k', 
+            capsize=1, capthick=0.75, markersize=5, elinewidth=0.75, 
             label=settings[i]
         )
 
