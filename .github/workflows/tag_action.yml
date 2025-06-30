@@ -55,8 +55,7 @@ jobs:
             bump="minor"
           elif echo "$body" | grep -iq '\[x\] *Patch'; then
             bump="patch"
-          fi
-          if [ -z "$bump" ]; then
+          else
             bump="commits"
           fi
           echo "Bump determined: $bump"
@@ -87,7 +86,7 @@ jobs:
             elif [ "$bump" = "minor" ]; then
               minor=$((minor + 1))
               patch=0
-            else
+            elif [ "$bump" = "patch" ]; then
               patch=$((patch + 1))
             fi
             next_version="v$major.$minor.$patch"
