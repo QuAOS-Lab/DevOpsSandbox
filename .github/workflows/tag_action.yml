@@ -5,7 +5,7 @@ permissions:
 
 on:
   push:
-    branches: [main, dev]
+    branches: [dev]
 
 jobs:
   tag:
@@ -36,14 +36,6 @@ jobs:
           echo "Latest dev tag: $tag"
           echo "dev_tag=$tag" >> $GITHUB_OUTPUT
 
-      - name: Get latest SemVer tag on main
-        id: get_main_tag
-        run: |
-          git fetch --all --tags
-          tag=$(git describe --tags $(git rev-list --tags --remotes=origin/main --max-count=1) 2>/dev/null || echo "v0.0.0")
-          echo "Latest main tag: $tag"
-          echo "main_tag=$tag" >> $GITHUB_OUTPUT
-
       - name: Determine bump from PR body or default to patch
         id: pr_bump
         run: |
@@ -64,48 +56,38 @@ jobs:
       - name: Handle tagging logic
         id: tag_logic
         run: |
-          source="${{ steps.detect.outputs.source_branch }}"
-          target="${{ steps.detect.outputs.target_branch }}"
-          if [ "$source" = "dev" ] && [ "$target" = "main" ]; then
-            # Copy dev tag to main
-            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
-            echo "Copying dev tag $tag to main"
-            echo "final_tag=$tag" >> $GITHUB_OUTPUT
-            echo "copy_tag=true" >> $GITHUB_OUTPUT
-          else
-            # Semver bump for PRs into dev, based on PR body or commits
-            tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
-            version=${tag#v}
-            IFS='.' read -r major minor patch extra <<< "$version"
-            bump="${{ steps.pr_bump.outputs.bump }}"
+          # Semver bump for PRs into dev, based on PR body or commits
+          tag="${{ steps.get_dev_tag.outputs.dev_tag }}"
+          version=${tag#v}
+          IFS='.' read -r major minor patch extra <<< "$version"
+          bump="${{ steps.pr_bump.outputs.bump }}"
 
-            if [ "$bump" = "major" ]; then
+          if [ "$bump" = "major" ]; then
               major=$((major + 1))
               minor=0
               patch=0
-            elif [ "$bump" = "minor" ]; then
+          elif [ "$bump" = "minor" ]; then
               minor=$((minor + 1))
               patch=0
-            elif [ "$bump" = "patch" ]; then
+          elif [ "$bump" = "patch" ]; then
               patch=$((patch + 1))
-            fi
-            next_version="v$major.$minor.$patch"
+          fi
+          next_version="v$major.$minor.$patch"
 
-            # Count only commits on dev since last tag
-            if [ "$bump" = "commits" ]; then
+          # Count only commits on dev since last tag
+          if [ "$bump" = "commits" ]; then
               if [ "$tag" = "v0.0.0" ]; then
               commit_count=$(git rev-list --count origin/dev)
               else
               commit_count=$(git rev-list --count $tag..origin/dev)
               fi
-            else
+          else
               commit_count=0
-            fi
-
-            full_tag="$next_version.$commit_count"
-            echo "final_tag=$full_tag" >> $GITHUB_OUTPUT
-            echo "copy_tag=false" >> $GITHUB_OUTPUT
           fi
+
+          full_tag="$next_version.$commit_count"
+          echo "final_tag=$full_tag" >> $GITHUB_OUTPUT
+          echo "copy_tag=false" >> $GITHUB_OUTPUT
 
       - name: Create and push tag
         if: steps.tag_logic.outputs.copy_tag == 'true' || steps.tag_logic.outputs.copy_tag == 'false'
