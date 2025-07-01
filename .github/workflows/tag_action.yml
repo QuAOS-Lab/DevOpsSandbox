@@ -22,11 +22,27 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-      - name: Detect PR source and target
-        id: detect
+      - name: Find merged PR for this commit
+        id: find_pr
         run: |
-          echo "source_branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
-          echo "target_branch=${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          pr=$(gh pr list --state merged --search ${{ github.sha }} --json number --jq '.[0].number')
+          if [ -z "$pr" ] || [ "$pr" = "null" ]; then
+          echo "No merged PR found for this commit."
+          exit 1
+          fi
+          echo "pr_number=$pr" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get PR body
+        id: pr_body
+        run: |
+          body=$(gh pr view ${{ steps.find_pr.outputs.pr_number }} --json body --jq '.body')
+          echo "pr_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get latest SemVer tag on dev
         id: get_dev_tag
@@ -39,7 +55,7 @@ jobs:
       - name: Determine bump from PR body or default to patch
         id: pr_bump
         run: |
-          body="${{ github.event.pull_request.body }}"
+          body="${{ steps.pr_body.outputs.pr_body }}"
           bump=""
           if echo "$body" | grep -iq '\[x\] *Major'; then
             bump="major"
@@ -66,21 +82,25 @@ jobs:
               major=$((major + 1))
               minor=0
               patch=0
+              extra=0
           elif [ "$bump" = "minor" ]; then
               minor=$((minor + 1))
               patch=0
+              extra=0
           elif [ "$bump" = "patch" ]; then
               patch=$((patch + 1))
+              extra=0
           fi
           next_version="v$major.$minor.$patch"
 
           # Count only commits on dev since last tag
           if [ "$bump" = "commits" ]; then
               if [ "$tag" = "v0.0.0" ]; then
-              commit_count=$(git rev-list --count origin/dev)
+                commit_count=$(git rev-list --count origin/dev)
               else
-              commit_count=$(git rev-list --count $tag..origin/dev)
+                commit_count=$(git rev-list --count $tag..origin/dev)
               fi
+              commit_count=$((commit_count + extra))
           else
               commit_count=0
           fi
