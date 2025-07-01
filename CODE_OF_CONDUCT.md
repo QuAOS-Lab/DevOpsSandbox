@@ -10,7 +10,6 @@ level of experience, education, socio-economic status, nationality, personal
 appearance, race, religion, or sexual identity and orientation.
 
 
-
 ## Our Standards
 
 Examples of behaviour that contributes to a positive environment for our
